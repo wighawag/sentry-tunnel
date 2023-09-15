@@ -38,8 +38,11 @@ async function handleRequest(request) {
     const path = url.pathname.slice(SLUG.length);
     // Fetch and pass the same response, including headers
     const response = await fetch(`https://browser.sentry-cdn.com/${path}`);
-		response.headers = {...response.headers, ...corsHeaders};
-		return response;
+		return new Response(response.body, {
+			headers: {...response.headers, ...corsHeaders},
+			status: response.status,
+			statusText: response.statusText
+		});
   }
 
   if (request.method === 'POST' && (url.pathname === SLUG || url.pathname === SLUG.slice(0, -1))) {
@@ -73,8 +76,11 @@ async function handleRequest(request) {
         const dsn = new URL(event.dsn);
         // Post to the Sentry endpoint!
         const response = await fetch(`https://${dsn.host}/api${dsn.pathname}/envelope/`, { method: 'POST', body });
-				response.headers = {...response.headers, ...corsHeaders};
-				return response;
+				return new Response(response.body, {
+					headers: {...response.headers, ...corsHeaders},
+					status: response.status,
+					statusText: response.statusText
+				});
       }
     }
   }
