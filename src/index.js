@@ -1,17 +1,48 @@
 // from https://gist.github.com/timfish/a69dd7457b8d6d97c0a8018675be6c23
 const SLUG = '/tunnel/';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,HEAD,POST,OPTIONS',
+  "Access-Control-Allow-Headers": "Content-Type",
+  'Access-Control-Max-Age': '86400',
+};
+function handleOptions(request) {
+  if (request.headers.get("Origin") !== null &&
+      request.headers.get("Access-Control-Request-Method") !== null &&
+      request.headers.get("Access-Control-Request-Headers") !== null) {
+    // Handle CORS pre-flight request.
+    return new Response(null, {
+      headers: corsHeaders
+    })
+  } else {
+    // Handle standard OPTIONS request.
+    return new Response(null, {
+      headers: {
+        "Allow": "GET, HEAD, POST, OPTIONS",
+      }
+    })
+  }
+}
+
 async function handleRequest(request) {
+
+	if (request.method === 'OPTIONS') {
+    return handleOptions(request);
+	}
+
   const url = new URL(request.url)
 
   // Handle requests for Sentry CDN JavaScript
   if (request.method === 'GET' && url.pathname.startsWith(SLUG) && (url.pathname.endsWith('.js') || url.pathname.endsWith('.js.map'))) {
     const path = url.pathname.slice(SLUG.length);
     // Fetch and pass the same response, including headers
-    return fetch(`https://browser.sentry-cdn.com/${path}`);
+    const response = await fetch(`https://browser.sentry-cdn.com/${path}`);
+		response.headers = {...response.headers, ...corsHeaders};
+		return response;
   }
 
-  if (request.method === 'POST' && url.pathname === SLUG) {
+  if (request.method === 'POST' && (url.pathname === SLUG || url.pathname === SLUG.slice(0, -1))) {
     let { readable, writable } = new TransformStream()
     request.body.pipeTo(writable);
 
@@ -41,7 +72,9 @@ async function handleRequest(request) {
         const event = JSON.parse(firstLine);
         const dsn = new URL(event.dsn);
         // Post to the Sentry endpoint!
-        return fetch(`https://${dsn.host}/api${dsn.pathname}/envelope/`, { method: 'POST', body });
+        const response = await fetch(`https://${dsn.host}/api${dsn.pathname}/envelope/`, { method: 'POST', body });
+				response.headers = {...response.headers, ...corsHeaders};
+				return response;
       }
     }
   }
